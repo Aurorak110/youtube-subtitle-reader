@@ -12,6 +12,6 @@ data/hls/
 # 日志
 *.log
 
-# ????
+# 中间产物
 gen_result.json
 __pycache__/
