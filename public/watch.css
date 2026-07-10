@@ -1,0 +1,282 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f7f7f8;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-bg: #eaf1ff;
+  --border: #e5e7eb;
+  --mark-bg: #fde68a;
+  --word-now: #f97316;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --card: #181b21;
+    --text: #f0f0f0;
+    --muted: #9aa1ab;
+    --accent: #5b9dff;
+    --accent-bg: #1c2740;
+    --border: #2a2e37;
+    --mark-bg: #7c5b12;
+    --word-now: #fb923c;
+  }
+}
+* { box-sizing: border-box; }
+
+/* 整页固定为一屏高、不滚动：视频永远可见，只有字幕/词表在各自区域内滚动 */
+html, body { height: 100%; }
+body {
+  margin: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.topbar .back {
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+}
+.topbar .title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toggles {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.toggles label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
+.status {
+  flex-shrink: 0;
+  padding: 4px 16px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.status:empty { display: none; }
+.status.error { color: #dc2626; }
+
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  padding: 12px 16px 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 视频：16:9，但高度不超过屏幕的 45%，保证字幕区始终有空间 */
+.player-wrap {
+  flex-shrink: 0;
+  position: relative;
+  align-self: center;
+  width: min(100%, calc(45dvh * 16 / 9));
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.player-wrap #player, .player-wrap iframe, .player-wrap video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 练习工具条：跟读/挖空控制 */
+.practice-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.practice-bar label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.practice-bar select, .practice-bar button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.practice-bar button:hover { color: var(--accent); border-color: var(--accent); }
+
+/* 挖空模式：生词变色块，点击揭晓；播放高亮也不剧透 */
+body.cloze-mode .en .vocab-hl:not(.revealed) {
+  background: var(--border) !important;
+  color: transparent !important;
+}
+
+.transcript {
+  /* 必须有定位上下文：行的 offsetTop 才是相对本容器算的，自动滚动才能对准 */
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin-top: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  overflow-y: auto;
+}
+.line {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.line:hover { background: var(--accent-bg); }
+.line.active { background: var(--accent-bg); }
+.line.flash { background: var(--mark-bg); }
+.line .en {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.line .zh {
+  margin-top: 4px;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+body.hide-zh .line .zh { display: none; }
+body.hide-vocab .en .vocab-hl {
+  background: none;
+  color: inherit;
+}
+
+/* 逐词卡拉OK：播放进度走到哪个词，哪个词亮起 */
+.en .w { border-radius: 4px; padding: 0 1px; }
+.en .w.vocab-hl {
+  background: var(--mark-bg);
+  cursor: help;
+}
+.en .w.current {
+  background: var(--word-now);
+  color: #fff;
+}
+
+.sidebar {
+  min-height: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  overflow-y: auto;
+  position: relative;
+}
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.sidebar-head h2 {
+  font-size: 0.95rem;
+  margin: 0;
+  color: var(--muted);
+}
+.sidebar-head button {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.sidebar-head button:hover { color: var(--accent); border-color: var(--accent); }
+.sidebar-head button:disabled { opacity: 0.5; cursor: default; }
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar li {
+  padding: 8px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.sidebar li:hover { background: var(--accent-bg); }
+.sidebar .term { font-weight: 600; }
+.sidebar .level {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: 1px;
+}
+.sidebar .zh { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+.sidebar .time {
+  float: right;
+  font-size: 0.78rem;
+  color: var(--muted);
+  opacity: 0.7;
+  margin-left: 8px;
+}
+.sidebar li.flash { background: var(--mark-bg); }
+.sidebar li.now {
+  background: var(--accent-bg);
+  border-left: 3px solid var(--accent);
+  padding-left: 6px;
+}
+
+/* 词表开关：关掉后字幕区占满整行（手机屏幕小时尤其有用） */
+body.hide-sidebar .sidebar { display: none; }
+body.hide-sidebar .layout { grid-template-columns: 1fr; }
+
+/* 手机：上下排列，视频固定顶部，字幕占主区域，词表收成底部小抽屉 */
+@media (max-width: 860px) {
+  .layout {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+  }
+  .main { flex: 1; min-height: 0; }
+  .player-wrap { width: min(100%, calc(38dvh * 16 / 9)); }
+  .transcript { margin-top: 10px; }
+  .sidebar {
+    flex-shrink: 0;
+    max-height: 22dvh;
+  }
+}

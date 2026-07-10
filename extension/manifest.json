@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube 双语学习字幕",
+  "version": "1.0.0",
+  "description": "看 YouTube 时同步显示英中对照字幕、生词高亮、跟读练习。需要本地字幕学习服务(localhost:4300)在运行。",
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": ["http://localhost:4300/*"]
+}

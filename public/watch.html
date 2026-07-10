@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>字幕学习页</title>
+<link rel="stylesheet" href="watch.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="/">‹</a>
+    <div class="title" id="title">加载中…</div>
+    <div class="toggles">
+      <label><input type="checkbox" id="toggle-zh" checked /> 中文</label>
+      <label><input type="checkbox" id="toggle-vocab" checked /> 生词高亮</label>
+      <label><input type="checkbox" id="toggle-sidebar" checked /> 词表</label>
+    </div>
+  </header>
+
+  <div id="status" class="status"></div>
+
+  <div class="layout">
+    <div class="main">
+      <div class="player-wrap">
+        <div id="player"></div>
+      </div>
+      <div class="practice-bar">
+        <select id="speed" title="播放速度">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+        </select>
+        <button id="replay" title="从本句开头重放">↺ 重放本句</button>
+        <label><input type="checkbox" id="loop-one" /> 单句循环</label>
+        <label><input type="checkbox" id="auto-pause" /> 逐句暂停</label>
+        <label><input type="checkbox" id="cloze" /> 挖空</label>
+      </div>
+      <div class="transcript" id="transcript"></div>
+    </div>
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h2>重点词 / 搭配</h2>
+        <button id="revocab" title="用更严格的高级词标准重新提取（不重新翻译）">↻ 重新提取</button>
+      </div>
+      <ul id="vocab-list"></ul>
+    </aside>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="hls.min.js"></script>
+  <script src="watch.js"></script>
+</body>
+</html>

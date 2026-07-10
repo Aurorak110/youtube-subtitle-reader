@@ -1,0 +1,18 @@
+{
+  "name": "youtube-subtitle-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "输入 YouTube 链接，生成双语逐句字幕学习网页",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "hls.js": "^1.6.16",
+    "undici": "^8.7.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.110.0"
+  }
+}

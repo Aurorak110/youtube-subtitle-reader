@@ -1,0 +1,131 @@
+/* YouTube 双语学习字幕 — 面板样式（ylr = YouTube Learning Reader） */
+#ylr-panel {
+  position: fixed;
+  top: 70px;
+  right: 12px;
+  z-index: 9999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+#ylr-panel.ylr-hidden { display: none; }
+
+/* 收起状态：只留一个小圆钮 */
+#ylr-tab {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+#ylr-panel.ylr-collapsed #ylr-tab { display: block; }
+#ylr-panel.ylr-collapsed #ylr-body { display: none; }
+
+#ylr-body {
+  width: 400px;
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #d9d9d9;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+@media (prefers-color-scheme: dark) {
+  #ylr-body {
+    background: #181b21;
+    color: #f0f0f0;
+    border-color: #2a2e37;
+  }
+}
+
+.ylr-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+.ylr-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#ylr-close {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+#ylr-close:hover { opacity: 1; }
+
+.ylr-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  opacity: 0.85;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+}
+.ylr-controls label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+
+.ylr-status {
+  padding: 4px 12px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.ylr-status:empty { display: none; }
+.ylr-status.ylr-error { color: #dc2626; opacity: 1; }
+
+#ylr-gen {
+  margin: 8px 12px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ylr-transcript {
+  position: relative;
+  flex: 1;
+  min-height: 60px;
+  overflow-y: auto;
+  padding: 6px;
+}
+.ylr-line {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ylr-line:hover, .ylr-line.ylr-active { background: rgba(37, 99, 235, 0.12); }
+.ylr-en { font-size: 14px; line-height: 1.55; }
+.ylr-zh { margin-top: 3px; font-size: 12.5px; opacity: 0.7; }
+
+#ylr-panel.ylr-hide-zh .ylr-zh { display: none; }
+
+.ylr-w { border-radius: 3px; padding: 0 1px; }
+.ylr-w.ylr-vocab { background: rgba(250, 204, 21, 0.45); cursor: help; }
+#ylr-panel.ylr-hide-hl .ylr-w.ylr-vocab { background: none; }
+.ylr-w.ylr-current { background: #f97316; color: #fff; }
+
+/* 挖空：生词变色块，点击揭晓 */
+#ylr-panel.ylr-cloze .ylr-w.ylr-vocab:not(.ylr-revealed) {
+  background: rgba(128, 128, 128, 0.55) !important;
+  color: transparent !important;
+}

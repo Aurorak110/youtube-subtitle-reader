@@ -1,0 +1,17 @@
+# 依赖与构建产物
+node_modules/
+site/
+
+# 私密：API key 绝不能上传
+config.json
+
+# 大文件：视频与切片不进仓库（字幕 JSON 会保留，换电脑可恢复视频库）
+data/videos/
+data/hls/
+
+# 日志
+*.log
+
+# ????
+gen_result.json
+__pycache__/
