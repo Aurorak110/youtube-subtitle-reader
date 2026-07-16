@@ -132,6 +132,15 @@ function scrollWithin(container, el) {
   });
 }
 
+// 播放跟随时把当前句顶到容器最上方（紧贴视频），而不是居中——
+// 居中会让上一句挨着视频、正在讲的这句偏下。留一点点上边距即可。
+function scrollLineToTop(container, el) {
+  container.scrollTo({
+    top: Math.max(0, el.offsetTop - 8),
+    behavior: 'smooth',
+  });
+}
+
 function jumpToSentence(index) {
   const lineEl = transcriptEl.querySelector(`.line[data-index="${index}"]`);
   if (!lineEl) return;
@@ -159,7 +168,7 @@ function setActiveLine(index) {
   const next = transcriptEl.querySelector(`.line[data-index="${index}"]`);
   if (next) {
     next.classList.add('active');
-    scrollWithin(transcriptEl, next);
+    scrollLineToTop(transcriptEl, next);
     activeWordEls = [...next.querySelectorAll('.w')];
     activeWordTimes = activeWordEls.map((el) => parseFloat(el.dataset.t));
     activeWordIdx = -1;

@@ -136,4 +136,127 @@ urlInput.addEventListener('keydown', (e) => {
 });
 searchInput.addEventListener('input', applySearch);
 
+// ---------- 批量缓存一个博主 ----------
+const batchUrlInput = document.getElementById('batch-url');
+const batchLimitInput = document.getElementById('batch-limit');
+const batchStartBtn = document.getElementById('batch-start');
+const batchProgressEl = document.getElementById('batch-progress');
+const batchBarFill = document.getElementById('batch-bar-fill');
+const batchTextEl = document.getElementById('batch-text');
+const batchFailsEl = document.getElementById('batch-fails');
+const batchStopBtn = document.getElementById('batch-stop');
+
+let batchTimer = null;
+let batchLastDone = -1;
+
+function renderBatch(job) {
+  if (!job) return;
+  batchProgressEl.style.display = 'block';
+  const pct = job.total ? Math.round((job.done / job.total) * 100) : 0;
+  batchBarFill.style.width = `${pct}%`;
+
+  if (job.running) {
+    batchStartBtn.disabled = true;
+    batchStopBtn.style.display = '';
+    const cur = job.current ? `正在处理：${job.current}` : '正在获取…';
+    batchTextEl.textContent = `${job.channel || ''} · ${job.done}/${job.total} · ${cur}${
+      job.cancelled ? '（取消中，本条完成后停止）' : ''
+    }`;
+  } else {
+    batchStartBtn.disabled = false;
+    batchStopBtn.style.display = 'none';
+    batchTextEl.textContent = `${job.channel || ''} · 完成：新增 ${job.okCount}，已有跳过 ${job.skipped}，失败 ${
+      job.failed.length
+    }${job.cancelled ? '（已取消剩余）' : ''}`;
+  }
+
+  batchFailsEl.innerHTML = (job.failed || [])
+    .map((f) => `<div>✕ ${escapeHtml(f.title)}：${escapeHtml(f.error || '')}</div>`)
+    .join('');
+
+  // 每完成一个视频就刷新一次视频库，新学习页立刻可点
+  if (job.done !== batchLastDone) {
+    batchLastDone = job.done;
+    loadLibrary();
+  }
+}
+
+async function pollBatch() {
+  try {
+    const res = await fetch('/api/batch/status');
+    const data = await res.json();
+    if (!data.ok || !data.job) return stopPolling();
+    renderBatch(data.job);
+    if (!data.job.running) stopPolling();
+  } catch {
+    stopPolling();
+  }
+}
+
+function startPolling() {
+  if (batchTimer) return;
+  batchTimer = setInterval(pollBatch, 2000);
+}
+
+function stopPolling() {
+  if (batchTimer) {
+    clearInterval(batchTimer);
+    batchTimer = null;
+  }
+}
+
+async function startBatch() {
+  const url = batchUrlInput.value.trim();
+  if (!url) {
+    batchProgressEl.style.display = 'block';
+    batchTextEl.textContent = '请先粘贴博主主页或视频链接';
+    return;
+  }
+  batchStartBtn.disabled = true;
+  batchProgressEl.style.display = 'block';
+  batchBarFill.style.width = '0%';
+  batchFailsEl.innerHTML = '';
+  batchLastDone = -1;
+  batchTextEl.textContent = '正在获取频道视频列表…（十几秒）';
+
+  try {
+    const res = await fetch('/api/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, limit: parseInt(batchLimitInput.value, 10) || 10 }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || '批量任务启动失败');
+    renderBatch(data.job);
+    startPolling();
+  } catch (err) {
+    batchTextEl.textContent = err.message;
+    batchStartBtn.disabled = false;
+  }
+}
+
+batchStartBtn?.addEventListener('click', startBatch);
+batchUrlInput?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') startBatch();
+});
+batchStopBtn?.addEventListener('click', async () => {
+  try {
+    await fetch('/api/batch/stop', { method: 'POST' });
+  } catch {}
+});
+
+// 页面打开时如果后台还有批量任务在跑（比如中途关过页面），接着显示进度
+(async () => {
+  try {
+    const res = await fetch('/api/batch/status');
+    const data = await res.json();
+    if (data.ok && data.job) {
+      renderBatch(data.job);
+      if (data.job.running) startPolling();
+    }
+  } catch {
+    // 云端静态版没有这个接口，忽略
+  }
+})();
+
 loadLibrary();

@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -7,6 +8,12 @@ import yt_dlp
 
 LANG_CANDIDATES = ["en", "en-US", "en-GB", "en-orig"]
 NOISE_RE = re.compile(r"^\[[^\]]*\]$")
+
+
+def cookie_opts():
+    """有 COOKIES_FILE 环境变量（且文件存在）时，用登录 cookies 绕过 bot 验证。"""
+    path = os.environ.get("COOKIES_FILE")
+    return {"cookiefile": path} if path and os.path.exists(path) else {}
 
 
 def get_track_url(info):
@@ -55,6 +62,7 @@ def main():
         "writesubtitles": True,
         "writeautomaticsub": True,
         "subtitlesformat": "json3",
+        **cookie_opts(),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)

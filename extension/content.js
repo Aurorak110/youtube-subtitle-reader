@@ -20,7 +20,11 @@
   let activeWordTimes = [];
   let activeWordIdx = -1;
 
-  let panel, transcriptEl, statusEl, titleEl, genBtn;
+  let panel, transcriptEl, statusEl, titleEl, genBtn, vocabUlEl;
+  let overlayEl, ovEnEl, ovZhEl;
+  let vocabLis = [];
+  let prevNowLis = [];
+  let prevLatestLi = null;
 
   function escapeHtml(str) {
     return String(str)
@@ -51,50 +55,115 @@
   }
 
   // ---------- 面板 ----------
+  // 面板挂到 YouTube 右侧栏（相关视频那一列），与视频并排、同屏可见；
+  // 当前句则单独叠加在视频画面上（见 overlay），看片时眼睛不用离开画面。
+  function mountTarget() {
+    return document.querySelector('#secondary-inner') || document.querySelector('#secondary') || null;
+  }
+
+  // 把面板放到右侧栏最上方（相关视频之上）
+  function attachPanel() {
+    if (!panel) return;
+    const host = mountTarget();
+    if (!host) return; // 页面还没渲染好，tick 会再试
+    // 已经挂在右栏里就不动，避免每次 tick 重排导致闪烁/滚动跳动
+    if (panel.parentNode === host) return;
+    host.insertBefore(panel, host.firstChild);
+  }
+
+  // 视频画面上的当前句叠加层
+  function playerContainer() {
+    return document.querySelector('#movie_player') || document.querySelector('.html5-video-player');
+  }
+  function buildOverlay() {
+    if (overlayEl) return;
+    overlayEl = document.createElement('div');
+    overlayEl.id = 'ylr-overlay';
+    overlayEl.innerHTML = '<div class="ylr-ov-en" id="ylr-ov-en"></div><div class="ylr-ov-zh" id="ylr-ov-zh"></div>';
+    ovEnEl = overlayEl.querySelector('#ylr-ov-en');
+    ovZhEl = overlayEl.querySelector('#ylr-ov-zh');
+    if (localStorage.getItem('ylrShowOverlay') === '0') overlayEl.classList.add('ylr-ov-off');
+    if (localStorage.getItem('ylrShowZh') === '0') overlayEl.classList.add('ylr-ov-hide-zh');
+  }
+  function attachOverlay() {
+    if (!overlayEl) return;
+    const pc = playerContainer();
+    if (!pc || overlayEl.parentNode === pc) return;
+    pc.appendChild(overlayEl);
+  }
+
   function buildPanel() {
     if (panel) return;
     panel = document.createElement('div');
     panel.id = 'ylr-panel';
     panel.innerHTML = `
-      <button id="ylr-tab" title="双语学习字幕">译</button>
       <div id="ylr-body">
         <div class="ylr-head">
           <span class="ylr-title" id="ylr-title">双语学习字幕</span>
-          <button id="ylr-close" title="收起">×</button>
-        </div>
-        <div class="ylr-controls">
-          <label><input type="checkbox" id="ylr-zh" checked /> 中文</label>
-          <label><input type="checkbox" id="ylr-hl" checked /> 生词</label>
-          <label><input type="checkbox" id="ylr-cloze" /> 挖空</label>
-          <label><input type="checkbox" id="ylr-loop" /> 单句循环</label>
-          <label><input type="checkbox" id="ylr-pause" /> 逐句暂停</label>
+          <div class="ylr-controls">
+            <label><input type="checkbox" id="ylr-zh" checked /> 中文</label>
+            <label><input type="checkbox" id="ylr-hl" checked /> 生词</label>
+            <label><input type="checkbox" id="ylr-cloze" /> 挖空</label>
+            <label><input type="checkbox" id="ylr-loop" /> 单句循环</label>
+            <label><input type="checkbox" id="ylr-pause" /> 逐句暂停</label>
+            <label><input type="checkbox" id="ylr-vocablist" checked /> 词表</label>
+            <label><input type="checkbox" id="ylr-overlay-tg" checked /> 叠加</label>
+          </div>
+          <button id="ylr-toggle" title="展开/收起">收起</button>
         </div>
         <div class="ylr-status" id="ylr-status"></div>
         <button id="ylr-gen" hidden>为这个视频生成学习字幕（约 1 分钟）</button>
-        <div class="ylr-transcript" id="ylr-transcript"></div>
+        <div class="ylr-content">
+          <div class="ylr-transcript" id="ylr-transcript"></div>
+          <aside class="ylr-vocablist" id="ylr-vocablist">
+            <div class="ylr-vocab-head">重点词 / 搭配</div>
+            <ul id="ylr-vocab-ul"></ul>
+          </aside>
+        </div>
       </div>`;
-    document.documentElement.appendChild(panel);
 
     transcriptEl = panel.querySelector('#ylr-transcript');
     statusEl = panel.querySelector('#ylr-status');
     titleEl = panel.querySelector('#ylr-title');
     genBtn = panel.querySelector('#ylr-gen');
+    vocabUlEl = panel.querySelector('#ylr-vocab-ul');
+
+    buildOverlay();
+    attachOverlay();
 
     const collapsed = localStorage.getItem('ylrCollapsed') === '1';
     panel.classList.toggle('ylr-collapsed', collapsed);
 
-    panel.querySelector('#ylr-tab').addEventListener('click', () => {
-      panel.classList.remove('ylr-collapsed');
-      localStorage.setItem('ylrCollapsed', '0');
+    const toggleBtn = panel.querySelector('#ylr-toggle');
+    toggleBtn.textContent = collapsed ? '展开字幕' : '收起';
+    toggleBtn.addEventListener('click', () => {
+      const nowCollapsed = !panel.classList.contains('ylr-collapsed');
+      panel.classList.toggle('ylr-collapsed', nowCollapsed);
+      toggleBtn.textContent = nowCollapsed ? '展开字幕' : '收起';
+      localStorage.setItem('ylrCollapsed', nowCollapsed ? '1' : '0');
     });
-    panel.querySelector('#ylr-close').addEventListener('click', () => {
-      panel.classList.add('ylr-collapsed');
-      localStorage.setItem('ylrCollapsed', '1');
-    });
+
+    attachPanel();
 
     panel.querySelector('#ylr-zh').addEventListener('change', (e) => {
       panel.classList.toggle('ylr-hide-zh', !e.target.checked);
+      // 视频叠加层的中文也一起跟随
+      if (overlayEl) overlayEl.classList.toggle('ylr-ov-hide-zh', !e.target.checked);
+      localStorage.setItem('ylrShowZh', e.target.checked ? '1' : '0');
     });
+    // 视频叠加开关
+    const ovToggle = panel.querySelector('#ylr-overlay-tg');
+    if (localStorage.getItem('ylrShowOverlay') === '0') ovToggle.checked = false;
+    ovToggle.addEventListener('change', (e) => {
+      if (overlayEl) overlayEl.classList.toggle('ylr-ov-off', !e.target.checked);
+      localStorage.setItem('ylrShowOverlay', e.target.checked ? '1' : '0');
+    });
+    // 中文开关初始状态（面板与叠加层保持一致）
+    if (localStorage.getItem('ylrShowZh') === '0') {
+      panel.querySelector('#ylr-zh').checked = false;
+      panel.classList.add('ylr-hide-zh');
+      if (overlayEl) overlayEl.classList.add('ylr-ov-hide-zh');
+    }
     panel.querySelector('#ylr-hl').addEventListener('change', (e) => {
       panel.classList.toggle('ylr-hide-hl', !e.target.checked);
     });
@@ -110,6 +179,17 @@
     panel.querySelector('#ylr-pause').addEventListener('change', (e) => {
       autoPause = e.target.checked;
       lastAutoPausedAt = -1;
+    });
+
+    // 词表开关：显示/隐藏右侧重点词列表，记忆到下次
+    const vlToggle = panel.querySelector('#ylr-vocablist');
+    if (localStorage.getItem('ylrShowVocab') === '0') {
+      vlToggle.checked = false;
+      panel.classList.add('ylr-hide-vocablist');
+    }
+    vlToggle.addEventListener('change', (e) => {
+      panel.classList.toggle('ylr-hide-vocablist', !e.target.checked);
+      localStorage.setItem('ylrShowVocab', e.target.checked ? '1' : '0');
     });
 
     genBtn.addEventListener('click', generate);
@@ -191,12 +271,84 @@
     });
   }
 
+  function formatTime(sec) {
+    const s = Math.max(0, Math.floor(sec));
+    const m = Math.floor(s / 60);
+    return `${m}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  // 更新视频画面上的当前句叠加（纯文本，保证在画面上清晰易读）
+  function updateOverlay(index) {
+    if (!overlayEl || !ovEnEl) return;
+    const s = sentences[index];
+    if (!s) return;
+    ovEnEl.textContent = s.text || '';
+    ovZhEl.textContent = s.zh || '';
+  }
+
+  // 右侧重点词列表：术语 + 级别标签 + 释义 + 时间戳，点击跳到该词所在句
+  function renderVocab() {
+    vocabUlEl.innerHTML = vocab
+      .map((v, i) => {
+        const sentence = sentences[v.sentenceIndex];
+        const time = sentence ? formatTime(sentence.start) : '';
+        const level = v.level ? `<span class="ylr-level">${escapeHtml(v.level)}</span>` : '';
+        return `<li data-index="${i}" data-sentence="${v.sentenceIndex}">
+          <div class="ylr-term">${escapeHtml(v.term)}${level}</div>
+          <div class="ylr-vzh">${escapeHtml(v.zh || '')}<span class="ylr-time">${time}</span></div>
+        </li>`;
+      })
+      .join('');
+
+    vocabLis = [...vocabUlEl.querySelectorAll('li')];
+    prevNowLis = [];
+    prevLatestLi = null;
+    vocabLis.forEach((li) => {
+      li._sentence = parseInt(li.dataset.sentence, 10);
+      li.addEventListener('click', () => {
+        const s = sentences[li._sentence];
+        const v = ytVideo();
+        if (s && v) {
+          v.currentTime = s.start;
+          v.play();
+        }
+        const line = transcriptEl.querySelector(`.ylr-line[data-index="${li._sentence}"]`);
+        if (line) scrollLineToTop(transcriptEl, line);
+      });
+    });
+  }
+
+  // 播到含重点词的句子时，右侧词表实时高亮并滚动跟随（只做增量 class 变更）
+  function updateVocabHighlight(index) {
+    if (!vocabLis.length) return;
+    prevNowLis.forEach((li) => li.classList.remove('ylr-now'));
+    prevNowLis = vocabLis.filter((li) => li._sentence === index);
+    prevNowLis.forEach((li) => li.classList.add('ylr-now'));
+
+    let latestLi = null;
+    for (const li of vocabLis) {
+      if (li._sentence <= index) latestLi = li;
+      else break;
+    }
+    if (latestLi && latestLi !== prevLatestLi) {
+      prevLatestLi = latestLi;
+      // 滚动的是外层可滚动的 aside（position:relative），不是内层的 ul
+      const aside = vocabUlEl.closest('.ylr-vocablist');
+      if (aside) scrollWithin(aside, latestLi);
+    }
+  }
+
   // ---------- 同步 ----------
   function scrollWithin(container, el) {
     container.scrollTo({
       top: el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2,
       behavior: 'smooth',
     });
+  }
+
+  // 播放跟随时把当前句顶到容器最上方（紧贴视频），而不是居中
+  function scrollLineToTop(container, el) {
+    container.scrollTo({ top: Math.max(0, el.offsetTop - 8), behavior: 'smooth' });
   }
 
   function setActiveLine(index) {
@@ -210,12 +362,14 @@
     const next = transcriptEl.querySelector(`.ylr-line[data-index="${index}"]`);
     if (next) {
       next.classList.add('ylr-active');
-      scrollWithin(transcriptEl, next);
+      scrollLineToTop(transcriptEl, next);
       activeWordEls = [...next.querySelectorAll('.ylr-w')];
       activeWordTimes = activeWordEls.map((el) => parseFloat(el.dataset.t));
       activeWordIdx = -1;
     }
     activeIndex = index;
+    updateVocabHighlight(index);
+    updateOverlay(index);
   }
 
   function syncWordHighlight(t) {
@@ -241,6 +395,10 @@
       if (id) loadForVideo(id);
       else panel && panel.classList.add('ylr-hidden');
     }
+
+    // SPA 导航后 YouTube 会重建右栏/播放器，把面板或叠加层冲掉；补挂回去
+    if (id && panel && !panel.isConnected) attachPanel();
+    if (id && overlayEl && !overlayEl.isConnected) attachOverlay();
 
     if (!sentences.length || loadedId !== currentId) return;
     const v = ytVideo();
@@ -281,17 +439,24 @@
     activeWordIdx = -1;
     lastAutoPausedAt = -1;
     loadedId = data.id;
+    prevNowLis = [];
+    prevLatestLi = null;
     titleEl.textContent = data.title || '双语学习字幕';
     renderTranscript();
+    renderVocab();
     setStatus('');
   }
 
   async function loadForVideo(id) {
     buildPanel();
+    attachPanel();
+    attachOverlay();
     panel.classList.remove('ylr-hidden');
     sentences = [];
     vocab = [];
     transcriptEl.innerHTML = '';
+    if (ovEnEl) ovEnEl.textContent = '';
+    if (ovZhEl) ovZhEl.textContent = '';
     genBtn.hidden = true;
     titleEl.textContent = '双语学习字幕';
     setStatus('查询缓存…');

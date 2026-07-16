@@ -122,9 +122,53 @@
     padding: 1px 6px;
   }
   .empty { color: var(--muted); font-size: 0.9rem; padding: 12px 4px; }
+
+  /* 批量缓存博主 */
+  .batch-card { margin-top: 16px; padding: 20px 24px; }
+  .batch-card h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  .batch-row { display: flex; gap: 10px; align-items: center; }
+  .batch-row input[type="number"] {
+    width: 86px;
+    padding: 12px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  #batch-progress { display: none; margin-top: 14px; }
+  .batch-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .batch-bar > div {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.4s;
+  }
+  #batch-text { margin-top: 8px; font-size: 0.88rem; color: var(--muted); }
+  #batch-fails { margin-top: 6px; font-size: 0.82rem; color: #dc2626; }
+  #batch-fails div { margin-top: 2px; }
+  #batch-stop {
+    margin-top: 10px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  #batch-stop:hover { color: #dc2626; border-color: #dc2626; }
+
   /* 云端静态模式：隐藏生成入口，显示提示 */
   .static-note { display: none; color: var(--muted); font-size: 0.88rem; margin: 0; }
   body.static-mode .gen-row, body.static-mode #status { display: none; }
+  body.static-mode .batch-card { display: none; }
   body.static-mode .static-note { display: block; }
   body.static-mode p.sub { margin-bottom: 8px; }
 </style>
@@ -140,6 +184,22 @@
       </div>
       <div id="status"></div>
       <p class="static-note">这是云端阅读版：随时随地打开学习。生成新视频请在电脑上操作，然后重新发布。</p>
+    </div>
+
+    <div class="card batch-card">
+      <h2>批量缓存一个博主</h2>
+      <p class="sub">粘贴博主主页链接（或 TA 任意一个视频的链接），一次把最新的多条视频都做成学习页。</p>
+      <div class="batch-row">
+        <input id="batch-url" type="text" placeholder="https://www.youtube.com/@博主 或任一视频链接" />
+        <input id="batch-limit" type="number" min="1" max="50" value="10" title="缓存最新几条视频" />
+        <button id="batch-start" class="primary">开始批量缓存</button>
+      </div>
+      <div id="batch-progress">
+        <div class="batch-bar"><div id="batch-bar-fill"></div></div>
+        <div id="batch-text"></div>
+        <div id="batch-fails"></div>
+        <button id="batch-stop">取消剩余任务</button>
+      </div>
     </div>
 
     <div class="library">

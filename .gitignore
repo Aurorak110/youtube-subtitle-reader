@@ -15,3 +15,9 @@ data/hls/
 # 中间产物
 gen_result.json
 __pycache__/
+
+# 翻译缓存的本地备份
+*.bak
+
+# 登录 cookies（含账号凭据，绝不上传）
+data/cookies.txt

@@ -1,40 +1,27 @@
-/* YouTube 双语学习字幕 — 面板样式（ylr = YouTube Learning Reader） */
+/* YouTube 双语学习字幕 — 面板样式（ylr = YouTube Learning Reader）
+   面板挂在 YouTube 右侧栏（相关视频那一列），与视频并排同屏可见；
+   当前句另有一层叠加在视频画面上（#ylr-overlay）。 */
+
+/* 把 YouTube 右侧栏整体加宽（默认 ~400px → ~620px，约屏幕 1/3），
+   面板随之变宽，视频区自动缩小让位，互不遮挡；全屏时不生效。
+   小屏用 34vw 兜底，避免侧栏挤掉视频。 */
+ytd-watch-flexy:not([fullscreen]) {
+  --ytd-watch-flexy-sidebar-width: min(620px, 34vw) !important;
+  --ytd-watch-flexy-sidebar-min-width: min(620px, 34vw) !important;
+}
 #ylr-panel {
-  position: fixed;
-  top: 70px;
-  right: 12px;
-  z-index: 9999;
+  margin: 0 0 16px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 #ylr-panel.ylr-hidden { display: none; }
 
-/* 收起状态：只留一个小圆钮 */
-#ylr-tab {
-  display: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: #2563eb;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-#ylr-panel.ylr-collapsed #ylr-tab { display: block; }
-#ylr-panel.ylr-collapsed #ylr-body { display: none; }
-
 #ylr-body {
-  width: 400px;
-  max-height: calc(100vh - 100px);
   display: flex;
   flex-direction: column;
   background: #fff;
-  color: #1a1a1a;
-  border: 1px solid #d9d9d9;
+  color: #0f0f0f;
+  border: 1px solid #e0e0e0;
   border-radius: 12px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
   overflow: hidden;
 }
 @media (prefers-color-scheme: dark) {
@@ -48,41 +35,52 @@
 .ylr-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.22);
 }
 .ylr-title {
-  flex: 1;
   font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 120px;
 }
-#ylr-close {
-  border: none;
-  background: none;
-  color: inherit;
-  font-size: 18px;
-  cursor: pointer;
-  opacity: 0.6;
-}
-#ylr-close:hover { opacity: 1; }
 
 .ylr-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 8px 12px;
+  gap: 5px 12px;
+  flex-basis: 100%;
   font-size: 12px;
   opacity: 0.85;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
 }
 .ylr-controls label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
 
+#ylr-toggle {
+  flex-shrink: 0;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: none;
+  color: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+#ylr-toggle:hover { opacity: 1; }
+
+/* 收起：只留标题栏 */
+#ylr-panel.ylr-collapsed .ylr-content,
+#ylr-panel.ylr-collapsed .ylr-status,
+#ylr-panel.ylr-collapsed #ylr-gen,
+#ylr-panel.ylr-collapsed .ylr-controls { display: none; }
+
 .ylr-status {
-  padding: 4px 12px;
+  padding: 6px 12px;
   font-size: 12px;
   opacity: 0.75;
 }
@@ -90,7 +88,7 @@
 .ylr-status.ylr-error { color: #dc2626; opacity: 1; }
 
 #ylr-gen {
-  margin: 8px 12px;
+  margin: 10px 12px;
   padding: 10px;
   border: none;
   border-radius: 8px;
@@ -101,12 +99,16 @@
   cursor: pointer;
 }
 
+/* 右栏较窄：字幕在上、词表在下，纵向堆叠 */
+.ylr-content { display: flex; flex-direction: column; }
+#ylr-panel.ylr-collapsed .ylr-content { display: none; }
+
 .ylr-transcript {
   position: relative;
-  flex: 1;
-  min-height: 60px;
+  max-height: 46vh;
+  min-height: 80px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 6px 10px;
 }
 .ylr-line {
   padding: 8px 10px;
@@ -114,18 +116,93 @@
   cursor: pointer;
 }
 .ylr-line:hover, .ylr-line.ylr-active { background: rgba(37, 99, 235, 0.12); }
-.ylr-en { font-size: 14px; line-height: 1.55; }
-.ylr-zh { margin-top: 3px; font-size: 12.5px; opacity: 0.7; }
-
+/* 英文在上、中文紧跟在下 */
+.ylr-en { font-size: 15px; line-height: 1.55; }
+.ylr-zh { margin-top: 3px; font-size: 13px; opacity: 0.72; }
 #ylr-panel.ylr-hide-zh .ylr-zh { display: none; }
 
 .ylr-w { border-radius: 3px; padding: 0 1px; }
 .ylr-w.ylr-vocab { background: rgba(250, 204, 21, 0.45); cursor: help; }
 #ylr-panel.ylr-hide-hl .ylr-w.ylr-vocab { background: none; }
 .ylr-w.ylr-current { background: #f97316; color: #fff; }
-
-/* 挖空：生词变色块，点击揭晓 */
 #ylr-panel.ylr-cloze .ylr-w.ylr-vocab:not(.ylr-revealed) {
   background: rgba(128, 128, 128, 0.55) !important;
   color: transparent !important;
 }
+
+/* 重点词列表：在字幕下方，占满右栏宽度 */
+.ylr-vocablist {
+  position: relative;
+  max-height: 30vh;
+  overflow-y: auto;
+  border-top: 1px solid rgba(128, 128, 128, 0.22);
+  padding: 6px 10px 8px;
+}
+#ylr-panel.ylr-hide-vocablist .ylr-vocablist { display: none; }
+.ylr-vocab-head { font-size: 12px; font-weight: 600; opacity: 0.6; padding: 2px 4px 8px; }
+.ylr-vocablist ul { list-style: none; margin: 0; padding: 0; }
+.ylr-vocablist li {
+  padding: 7px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 3px;
+}
+.ylr-vocablist li:hover { background: rgba(37, 99, 235, 0.12); }
+.ylr-vocablist li.ylr-now {
+  background: rgba(37, 99, 235, 0.14);
+  border-left: 3px solid #2563eb;
+  padding-left: 3px;
+}
+.ylr-term { font-weight: 600; font-size: 13px; }
+.ylr-level {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 400;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: 1px;
+}
+@media (prefers-color-scheme: dark) {
+  .ylr-level { color: #7ab0ff; }
+}
+.ylr-vzh { font-size: 12px; opacity: 0.72; margin-top: 2px; }
+.ylr-time { float: right; font-size: 11px; opacity: 0.55; margin-left: 8px; }
+
+/* ---------- 视频画面上的当前句叠加 ---------- */
+#ylr-overlay {
+  position: absolute;
+  left: 50%;
+  bottom: 68px; /* 高于 YouTube 控制条，避免遮挡 */
+  transform: translateX(-50%);
+  max-width: 92%;
+  text-align: center;
+  z-index: 30;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+#ylr-overlay.ylr-ov-off { display: none; }
+.ylr-ov-en {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 19px;
+  line-height: 1.35;
+  padding: 2px 9px;
+  border-radius: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.ylr-ov-zh {
+  display: inline-block;
+  margin-top: 3px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #ffe9c7;
+  font-size: 16px;
+  line-height: 1.35;
+  padding: 2px 9px;
+  border-radius: 4px;
+}
+#ylr-overlay.ylr-ov-hide-zh .ylr-ov-zh { display: none; }
+.ylr-ov-en:empty, .ylr-ov-zh:empty { display: none; }
