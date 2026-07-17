@@ -123,6 +123,17 @@
   }
   .empty { color: var(--muted); font-size: 0.9rem; padding: 12px 4px; }
 
+  /* 单词本入口 */
+  .wordbook-entry {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 16px; padding: 16px 20px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    text-decoration: none; color: var(--text); font-weight: 600;
+    transition: border-color 0.15s;
+  }
+  .wordbook-entry:hover { border-color: var(--accent); }
+  .wordbook-entry .wb-arrow { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+
   /* 批量缓存博主 */
   .batch-card { margin-top: 16px; padding: 20px 24px; }
   .batch-card h2 { font-size: 1.05rem; margin: 0 0 4px; }
@@ -201,6 +212,11 @@
         <button id="batch-stop">取消剩余任务</button>
       </div>
     </div>
+
+    <a class="wordbook-entry" href="/wordbook">
+      <span>📒 我的单词本</span>
+      <span class="wb-arrow">汇总所有生词 · 医学词根词缀拆解 →</span>
+    </a>
 
     <div class="library">
       <div class="library-head">

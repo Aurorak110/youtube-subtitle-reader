@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 
 const { extractVideoId } = require('./lib/videoId');
 const { groupIntoSentences } = require('./lib/segments');
-const { translateAndExtractVocab, extractVocabOnly } = require('./lib/openai');
+const { translateAndExtractVocab, extractVocabOnly, analyzeMorphology } = require('./lib/openai');
 
 const PORT = process.env.PORT || 4300;
 const DATA_DIR = path.join(__dirname, 'data');
@@ -306,6 +306,97 @@ app.post('/api/batch/stop', (req, res) => {
   res.json({ ok: true, job: batchJob });
 });
 
+// ---------- 单词本：把所有视频的生词汇总成一本可复习的词书 ----------
+// 词根词缀拆解结果单独缓存在 data/morphology.json（key = 小写词），只算一次不重复花钱。
+const MORPH_FILE = path.join(DATA_DIR, 'morphology.json');
+function loadMorph() {
+  try {
+    return JSON.parse(fs.readFileSync(MORPH_FILE, 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+// 扫描所有视频缓存，按词条去重汇总；记录出现频次和出现在哪些视频
+function aggregateWordbook() {
+  const skip = new Set(['morphology.json', 'manifest.json']);
+  const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json') && !skip.has(f));
+  const byTerm = new Map();
+  for (const f of files) {
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf-8'));
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(data.vocab)) continue;
+    for (const v of data.vocab) {
+      if (!v || !v.term) continue;
+      const key = v.term.trim().toLowerCase();
+      if (!byTerm.has(key)) {
+        byTerm.set(key, { term: v.term.trim(), zh: v.zh || '', level: v.level || '', count: 0, videos: [] });
+      }
+      const e = byTerm.get(key);
+      e.count++;
+      if (data.id && !e.videos.includes(data.id)) e.videos.push(data.id);
+    }
+  }
+  return byTerm;
+}
+
+function isMedicalLevel(level) {
+  return level === '医学' || level === '术语';
+}
+
+// 组装单词本：汇总 + 合并已缓存的词根拆解
+function buildWordbook() {
+  const byTerm = aggregateWordbook();
+  const morph = loadMorph();
+  const items = [...byTerm.values()].map((e) => ({
+    ...e,
+    morph: morph[e.term.toLowerCase()] || null,
+  }));
+  // 医学词优先、再按出现频次、再按字母
+  items.sort((a, b) => {
+    const am = isMedicalLevel(a.level) ? 0 : 1;
+    const bm = isMedicalLevel(b.level) ? 0 : 1;
+    return am - bm || b.count - a.count || a.term.localeCompare(b.term);
+  });
+  const medicalTotal = items.filter((i) => isMedicalLevel(i.level)).length;
+  const medicalAnalyzed = items.filter((i) => isMedicalLevel(i.level) && i.morph).length;
+  return { items, medicalTotal, medicalAnalyzed };
+}
+
+app.get('/api/wordbook', (req, res) => {
+  res.json({ ok: true, ...buildWordbook() });
+});
+
+// 对还没拆解的医学词批量做词根词缀拆解，结果写入缓存
+app.post('/api/wordbook/analyze', async (req, res) => {
+  try {
+    const byTerm = aggregateWordbook();
+    const morph = loadMorph();
+    const todo = [...byTerm.values()]
+      .filter((e) => isMedicalLevel(e.level) && !morph[e.term.toLowerCase()])
+      .map((e) => e.term);
+
+    if (!todo.length) {
+      return res.json({ ok: true, analyzed: 0, ...buildWordbook() });
+    }
+
+    const result = await analyzeMorphology(todo);
+    result.forEach((val, key) => {
+      morph[key] = val;
+    });
+    fs.writeFileSync(MORPH_FILE, JSON.stringify(morph));
+    console.log(`词根拆解完成: 新增 ${result.size} 个词`);
+    res.json({ ok: true, analyzed: result.size, ...buildWordbook() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: err.message || '词根拆解失败' });
+  }
+});
+
 // 视频库：列出所有已生成的学习页，按博主分组交给前端渲染
 app.get('/api/library', (req, res) => {
   const files = fs.readdirSync(DATA_DIR).filter((f) => f.endsWith('.json'));
@@ -360,6 +451,10 @@ app.get('/api/video/:id', (req, res) => {
 
 app.get('/watch', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'watch.html'));
+});
+
+app.get('/wordbook', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'wordbook.html'));
 });
 
 function getLanIPs() {

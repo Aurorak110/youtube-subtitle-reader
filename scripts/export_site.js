@@ -78,6 +78,15 @@ for (const f of fs.readdirSync(PUBLIC_DIR)) {
   }
 }
 
+// 单词本：汇总所有视频生词 + 合并词根拆解缓存，导出成静态 JSON 供云端只读
+let morph = {};
+try {
+  morph = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'morphology.json'), 'utf-8'));
+} catch {
+  // 还没做过拆解，正常
+}
+const wbByTerm = new Map();
+
 const items = [];
 for (const f of fs.readdirSync(DATA_DIR)) {
   if (!f.endsWith('.json')) continue;
@@ -85,6 +94,17 @@ for (const f of fs.readdirSync(DATA_DIR)) {
     const full = path.join(DATA_DIR, f);
     const data = JSON.parse(fs.readFileSync(full, 'utf-8'));
     if (!data.id || !data.sentences) continue;
+
+    for (const v of data.vocab || []) {
+      if (!v || !v.term) continue;
+      const key = v.term.trim().toLowerCase();
+      if (!wbByTerm.has(key)) {
+        wbByTerm.set(key, { term: v.term.trim(), zh: v.zh || '', level: v.level || '', count: 0, videos: [] });
+      }
+      const e = wbByTerm.get(key);
+      e.count++;
+      if (!e.videos.includes(data.id)) e.videos.push(data.id);
+    }
 
     const hasHls = ensureHls(data.id);
     if (hasHls) {
@@ -112,4 +132,22 @@ for (const f of fs.readdirSync(DATA_DIR)) {
 items.sort((a, b) => b.addedAt - a.addedAt);
 fs.writeFileSync(path.join(SITE_DIR, 'manifest.json'), JSON.stringify({ ok: true, items }));
 
-console.log(`导出完成: ${items.length} 个视频 -> ${SITE_DIR}`);
+// 导出单词本 JSON（与 /api/wordbook 相同的结构，云端静态版直接读）
+const isMed = (lv) => lv === '医学' || lv === '术语';
+const wbItems = [...wbByTerm.values()].map((e) => ({ ...e, morph: morph[e.term.toLowerCase()] || null }));
+wbItems.sort((a, b) => {
+  const am = isMed(a.level) ? 0 : 1;
+  const bm = isMed(b.level) ? 0 : 1;
+  return am - bm || b.count - a.count || a.term.localeCompare(b.term);
+});
+fs.writeFileSync(
+  path.join(SITE_DIR, 'wordbook.json'),
+  JSON.stringify({
+    ok: true,
+    items: wbItems,
+    medicalTotal: wbItems.filter((i) => isMed(i.level)).length,
+    medicalAnalyzed: wbItems.filter((i) => isMed(i.level) && i.morph).length,
+  })
+);
+
+console.log(`导出完成: ${items.length} 个视频、${wbItems.length} 个生词 -> ${SITE_DIR}`);

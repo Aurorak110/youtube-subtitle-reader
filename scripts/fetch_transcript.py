@@ -47,6 +47,45 @@ def parse_json3(raw):
     return cues
 
 
+# 不同播放器客户端被 YouTube 风控的程度不一样；逐个换着试，能显著降低
+# 「Sign in to confirm you're not a bot」这类间歇性拦截的失败率。
+PLAYER_CLIENTS = [
+    ["web"],
+    ["mweb"],
+    ["tv"],
+    ["web_safari", "web"],
+]
+
+
+def extract_with_fallback(url):
+    """依次尝试多个播放器客户端，返回 (info, last_error)。"""
+    last_err = None
+    for clients in PLAYER_CLIENTS:
+        ydl_opts = {
+            "skip_download": True,
+            "quiet": True,
+            "no_warnings": True,
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitlesformat": "json3",
+            # 只要字幕：视频格式列表为空（SABR/风控降级）时不要让格式选择报
+            # "Requested format is not available" 连累字幕抓取
+            "ignore_no_formats_error": True,
+            "extractor_args": {"youtube": {"player_client": clients}},
+            **cookie_opts(),
+        }
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+            # 拿到字幕轨道就算成功；否则换下一个客户端再试
+            if get_track_url(info)[0] or info.get("subtitles") or info.get("automatic_captions"):
+                return info, None
+            last_err = "no_subs"
+        except Exception as e:
+            last_err = str(e)
+    return None, last_err
+
+
 def main():
     if len(sys.argv) < 2:
         print(json.dumps({"ok": False, "error": "missing video id"}))
@@ -55,17 +94,22 @@ def main():
     video_id = sys.argv[1]
     url = f"https://www.youtube.com/watch?v={video_id}"
 
-    ydl_opts = {
-        "skip_download": True,
-        "quiet": True,
-        "no_warnings": True,
-        "writesubtitles": True,
-        "writeautomaticsub": True,
-        "subtitlesformat": "json3",
-        **cookie_opts(),
-    }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    info, err = extract_with_fallback(url)
+    if info is None:
+        has_cookies = bool(cookie_opts())
+        if err and "not a bot" in err:
+            hint = "被 YouTube 判定为机器人，登录 cookies 已失效。请重新导出 data/cookies.txt（见 README）。"
+        elif err and ("LOGIN_REQUIRED" in err or "Sign in" in err):
+            hint = "该视频需要登录，cookies 已失效或缺失。请更新 data/cookies.txt。"
+        elif not has_cookies:
+            hint = "未配置登录 cookies，YouTube 拒绝了请求。请放置 data/cookies.txt（见 README）。"
+        elif err == "no_subs":
+            hint = ("尝试了多个播放器客户端仍拿不到字幕：该视频要么确实没有英文字幕，"
+                    "要么登录态被 YouTube 拦下。若其它视频也普遍失败，请更新 data/cookies.txt。")
+        else:
+            hint = f"字幕获取失败: {(err or '')[:120]}"
+        print(json.dumps({"ok": False, "error": hint}))
+        return
 
     track_url, is_auto = get_track_url(info)
     if not track_url:
