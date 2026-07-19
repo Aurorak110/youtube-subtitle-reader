@@ -19,5 +19,7 @@ __pycache__/
 # 翻译缓存的本地备份
 *.bak
 
-# 登录 cookies（含账号凭据，绝不上传）
-data/cookies.txt
+# 登录 cookies（含账号凭据，绝不上传）。覆盖各种命名：cookies.txt、
+# cookies.txt.txt（Windows 双扩展名）、cookies (1).txt 等
+cookies*.txt*
+data/cookies*

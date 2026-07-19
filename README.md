@@ -99,19 +99,21 @@ call npx wrangler pages deploy site --project-name=你的项目名 --commit-dirt
 
 ## cookies（被 YouTube 拦截时）
 
-如果生成时报「YouTube 要求登录验证 / Sign in to confirm you're not a bot」，多半是短时间抓太多触发的临时限制，**等几小时通常自动恢复**。若持续，用登录态绕过：
+如果生成时报 YouTube 登录验证、或提示“只返回了视频标题，未返回格式或字幕轨道”，多半是短时间抓太多触发的临时限制，**等几小时通常自动恢复**。若持续，用完整的登录态绕过：
 
-1. Chrome 装一个导出 cookies 的扩展（如「Get cookies.txt LOCALLY」）
-2. 打开 youtube.com（保持登录），用该扩展导出 **Netscape 格式** 的 cookies
-3. 存成 `data/cookies.txt`（放到项目的 data 文件夹里）
+1. Chrome 装一个能导出 **HttpOnly cookies** 的扩展（如「Get cookies.txt LOCALLY」）
+2. 打开 `youtube.com`，确认右上角显示你的登录头像；不要退出、不要清理站点数据
+3. 立即导出该站点的**全部** cookies，格式选 **Netscape cookies.txt**，存成 `data/cookies.txt`
+4. 重启本地服务后再试。程序会检查文件中是否同时包含 `LOGIN_INFO` 和 `SAPISID` / `__Secure-1PAPISID` / `__Secure-3PAPISID`；缺任一项都不是 yt-dlp 可用的登录态，需要重新导出。
 
-之后本地服务的抓取会自动带上它。`data/cookies.txt` 已被 .gitignore 排除，不会上传。
+之后本地服务的抓取会自动带上它。`data/cookies.txt` 是账号凭据，已被 `.gitignore` 排除，**不要上传、发送或提交到 GitHub**。
 
 ## 常见问题
 
 - **429 insufficient_quota** — API 账户没余额，去充值
 - **"该视频没有可用的英文字幕"** — 换一个有英文字幕的视频
-- **"YouTube 要求登录验证 / not a bot"** — 见上方 cookies 一节；或等几小时
+- **"YouTube 要求登录验证 / not a bot"** 或 **"只返回了视频标题"** — 这是 YouTube 对当前出口/IP 的限制，并非字幕不存在；先等一段时间，持续出现则按上方步骤重新导出完整 cookies
+- **"cookies 缺少 LOGIN_INFO"** — 文件虽然存在但不是有效登录态，通常是导出时未登录、只导出了部分 cookie，或浏览器已轮换了会话；重新打开 YouTube 确认登录后导出全部 cookies
 - **手机（局域网）打不开** — 手机和电脑要同一 WiFi；防火墙弹窗选「允许」。想在外网（不同 WiFi / 4G）看，用云端版（第 5 步发布，得到一个 `*.pages.dev` 网址，随处可开）
 - **插件面板显示"本地服务未启动"** — 双击 `启动.bat`
 - **生成很慢** — 视频越长翻译越久，1 小时以上可能要几分钟

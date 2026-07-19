@@ -1,19 +1,55 @@
+import http.cookiejar
 import json
 import os
 import re
 import sys
+import time
 import urllib.request
 
 import yt_dlp
 
 LANG_CANDIDATES = ["en", "en-US", "en-GB", "en-orig"]
 NOISE_RE = re.compile(r"^\[[^\]]*\]$")
+AUTH_COOKIE_NAMES = {"SAPISID", "__Secure-1PAPISID", "__Secure-3PAPISID"}
 
 
-def cookie_opts():
-    """有 COOKIES_FILE 环境变量（且文件存在）时，用登录 cookies 绕过 bot 验证。"""
+def cookie_status():
+    """检查 cookies.txt 是否是 yt-dlp 能识别的有效 YouTube 登录态。
+
+    仅文件存在或未过期并不代表登录仍有效。yt-dlp 需要 LOGIN_INFO 加上
+    SAPISID / 1PAPISID / 3PAPISID 中的一个，才能把它当作账号 cookies。
+    """
     path = os.environ.get("COOKIES_FILE")
-    return {"cookiefile": path} if path and os.path.exists(path) else {}
+    if not path or not os.path.exists(path):
+        return {"usable": False, "reason": "未找到 data/cookies.txt"}
+
+    try:
+        jar = http.cookiejar.MozillaCookieJar(path)
+        jar.load(ignore_discard=True, ignore_expires=True)
+    except Exception as e:
+        return {"usable": False, "reason": f"data/cookies.txt 不是可读取的 Netscape 格式：{e}"}
+
+    now = time.time()
+    names = {
+        cookie.name
+        for cookie in jar
+        if cookie.domain.lstrip(".").endswith("youtube.com")
+        and (not cookie.expires or cookie.expires > now)
+    }
+    if not names:
+        return {"usable": False, "reason": "data/cookies.txt 没有未过期的 youtube.com cookies"}
+    if "LOGIN_INFO" not in names:
+        return {"usable": False, "reason": "data/cookies.txt 缺少 LOGIN_INFO，yt-dlp 不会将其视为已登录"}
+    if not names.intersection(AUTH_COOKIE_NAMES):
+        return {"usable": False, "reason": "data/cookies.txt 缺少 SAPISID / __Secure-1PAPISID / __Secure-3PAPISID"}
+    return {"usable": True, "reason": ""}
+
+
+def cookie_opts(status=None):
+    """只传递经过完整性校验的登录 cookies，避免半失效状态干扰匿名请求。"""
+    status = status or cookie_status()
+    path = os.environ.get("COOKIES_FILE")
+    return {"cookiefile": path} if status["usable"] else {}
 
 
 def get_track_url(info):
@@ -57,7 +93,7 @@ PLAYER_CLIENTS = [
 ]
 
 
-def extract_with_fallback(url):
+def extract_with_fallback(url, cookies):
     """依次尝试多个播放器客户端，返回 (info, last_error)。"""
     last_err = None
     for clients in PLAYER_CLIENTS:
@@ -72,7 +108,7 @@ def extract_with_fallback(url):
             # "Requested format is not available" 连累字幕抓取
             "ignore_no_formats_error": True,
             "extractor_args": {"youtube": {"player_client": clients}},
-            **cookie_opts(),
+            **cookie_opts(cookies),
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -80,7 +116,9 @@ def extract_with_fallback(url):
             # 拿到字幕轨道就算成功；否则换下一个客户端再试
             if get_track_url(info)[0] or info.get("subtitles") or info.get("automatic_captions"):
                 return info, None
-            last_err = "no_subs"
+            # 被风控时 yt-dlp 仍可能拿到标题，却没有格式和字幕。此前这被误报成
+            # “视频没有英文字幕”，令用户无法判断真正的网络/登录态问题。
+            last_err = "empty_player" if not info.get("formats") else "no_subs"
         except Exception as e:
             last_err = str(e)
     return None, last_err
@@ -94,15 +132,21 @@ def main():
     video_id = sys.argv[1]
     url = f"https://www.youtube.com/watch?v={video_id}"
 
-    info, err = extract_with_fallback(url)
+    cookies = cookie_status()
+    info, err = extract_with_fallback(url, cookies)
     if info is None:
-        has_cookies = bool(cookie_opts())
+        has_cookies = cookies["usable"]
         if err and "not a bot" in err:
             hint = "被 YouTube 判定为机器人，登录 cookies 已失效。请重新导出 data/cookies.txt（见 README）。"
         elif err and ("LOGIN_REQUIRED" in err or "Sign in" in err):
             hint = "该视频需要登录，cookies 已失效或缺失。请更新 data/cookies.txt。"
+        elif err == "empty_player":
+            cookie_hint = "当前没有可用登录态" if not has_cookies else "当前登录态也未能通过验证"
+            hint = ("YouTube 只返回了视频标题，未返回任何可播放格式或字幕轨道（不是“没有英文字幕”）。"
+                    f"这通常表示当前网络出口/IP 被限制，{cookie_hint}。"
+                    + (f"{cookies['reason']}。" if not has_cookies else "请稍后重试或重新导出 cookies。"))
         elif not has_cookies:
-            hint = "未配置登录 cookies，YouTube 拒绝了请求。请放置 data/cookies.txt（见 README）。"
+            hint = f"没有可用的登录 cookies：{cookies['reason']}。请按 README 重新导出完整的 data/cookies.txt。"
         elif err == "no_subs":
             hint = ("尝试了多个播放器客户端仍拿不到字幕：该视频要么确实没有英文字幕，"
                     "要么登录态被 YouTube 拦下。若其它视频也普遍失败，请更新 data/cookies.txt。")
@@ -140,5 +184,4 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print(json.dumps({"ok": False, "error": f"字幕获取失败: {e}"}))
-
 

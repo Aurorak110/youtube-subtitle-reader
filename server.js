@@ -21,14 +21,24 @@ fs.mkdirSync(VIDEOS_DIR, { recursive: true });
 // 可选的登录 cookies：被 YouTube 判定为 "not a bot" 时，放一份 Netscape 格式的
 // cookies.txt 到这里即可用真实登录态抓取（见 README）。存在才用，不存在照常匿名抓。
 const COOKIES_FILE = path.join(DATA_DIR, 'cookies.txt');
+
+// 只有像真实登录态的 cookies 才交给 yt-dlp。半失效文件（缺 LOGIN_INFO）反而
+// 干扰匿名请求——与 fetch_transcript.py / list_channel.py 的校验口径一致（轻量版）。
+function cookiesUsable() {
+  try {
+    const txt = fs.readFileSync(COOKIES_FILE, 'utf-8');
+    return /\bLOGIN_INFO\b/.test(txt) && /\b(SAPISID|__Secure-1PAPISID|__Secure-3PAPISID)\b/.test(txt);
+  } catch {
+    return false;
+  }
+}
 function cookieArgs(prefix) {
-  // prefix: yt-dlp CLI 用 '--cookies'；fetch_transcript.py / list_channel.py 走环境变量
-  return fs.existsSync(COOKIES_FILE) ? [prefix, COOKIES_FILE] : [];
+  // prefix: yt-dlp CLI 用 '--cookies'（下载视频）
+  return cookiesUsable() ? [prefix, COOKIES_FILE] : [];
 }
 function pythonEnv() {
-  return fs.existsSync(COOKIES_FILE)
-    ? { ...process.env, COOKIES_FILE }
-    : process.env;
+  // COOKIES_FILE 始终传给脚本，由脚本自身做完整校验（jar 解析 + 过期检查）
+  return fs.existsSync(COOKIES_FILE) ? { ...process.env, COOKIES_FILE } : process.env;
 }
 
 const app = express();

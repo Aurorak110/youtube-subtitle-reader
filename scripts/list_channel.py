@@ -11,19 +11,43 @@
 - 裸 handle: @SomeDoctor
 """
 
+import http.cookiejar
 import json
 import os
 import re
 import sys
+import time
 import urllib.parse
 import urllib.request
 
 import yt_dlp
 
+AUTH_COOKIE_NAMES = {"SAPISID", "__Secure-1PAPISID", "__Secure-3PAPISID"}
+
 
 def cookie_opts():
+    """只在 cookies.txt 是有效 YouTube 登录态时才传给 yt-dlp。
+
+    与 fetch_transcript.py 同一套校验：半失效的 cookie 文件反而会干扰
+    匿名请求，宁可不传。要求 LOGIN_INFO + SAPISID/1PAPISID/3PAPISID 之一。
+    """
     path = os.environ.get("COOKIES_FILE")
-    return {"cookiefile": path} if path and os.path.exists(path) else {}
+    if not path or not os.path.exists(path):
+        return {}
+    try:
+        jar = http.cookiejar.MozillaCookieJar(path)
+        jar.load(ignore_discard=True, ignore_expires=True)
+    except Exception:
+        return {}
+    now = time.time()
+    names = {
+        c.name
+        for c in jar
+        if c.domain.lstrip(".").endswith("youtube.com") and (not c.expires or c.expires > now)
+    }
+    if "LOGIN_INFO" in names and names.intersection(AUTH_COOKIE_NAMES):
+        return {"cookiefile": path}
+    return {}
 
 # 频道根页（没有指定 tab）：flat 抽取会返回 Videos/Shorts 等 tab 而不是视频，
 # 所以统一改写到 /videos 标签页（只含正常视频，不含 shorts/直播）
